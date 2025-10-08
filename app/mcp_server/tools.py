@@ -45,8 +45,20 @@ def call_tool(name: str, args: dict, db: Session):
         }
 
     if name == "briefing.get":
-        window = args.get("range", "today")
-        hours = 24 if window == "today" else (48 if window == "48h" else 7 * 24)
+        window = (args.get("range") or "today").lower()
+        synonyms = {
+            "today": ["today", "now", "tonight"],
+            "48h": ["48h", "2d", "two days", "next 48 hours", "today and tomorrow"],
+            "week": ["week", "this week", "7d", "next 7 days"]
+        }
+        def pick_range(s):
+            for key, vals in synonyms.items():
+                if s == key or s in vals:
+                    return key
+            return "today"
+
+        r = pick_range(window)
+        hours = 24 if r == "today" else (48 if r == "48h" else 7 * 24)
         assignments = crud.upcoming_assignments(db, window_hours=hours, limit=10)
         items = [
             {

@@ -4,6 +4,11 @@ from fastapi import FastAPI, Depends, Request, HTTPException, Header
 from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.mcp_server.tools import list_tools as _list_tools, call_tool as _call_tool
+from app.mcp_server.resources import (
+    list_resources as _list_resources,
+    read_resource as _read_resource,
+    list_templates as _list_templates,
+)
 from typing import Dict, Any
 import os
 
@@ -76,6 +81,7 @@ async def mcp(
                 "capabilities": {
                     "roots": {"listChanged": True},
                     "tools": {"listChanged": True},
+                    "resources": {"listChanged": True},
                     "sampling": {},
                     "elicitation": {}
                 },
@@ -104,6 +110,24 @@ async def mcp(
             # The result from _call_tool already contains structuredContent, content, and _meta.
             # We place this raw result directly into the JSON-RPC 'result' envelope.
             return create_success_response(request_id, result)
+
+        # --- Resources listing/reading (MCP) ---
+        if method in ("resources/list",):
+            return create_success_response(request_id, {"resources": _list_resources()})
+
+        if method in ("resources/read",):
+            params = body.get("params", {}) or {}
+            uri = params.get("uri")
+            if not uri:
+                return create_error_response(request_id, -32602, "Missing 'uri' in params.")
+            resource = _read_resource(uri)
+            if not resource:
+                return create_error_response(request_id, -32602, f"Unknown resource: {uri}")
+            return create_success_response(request_id, resource)
+
+        # --- Resource templates (optional, makes Inspector UI happy) ---
+        if method in ("resources/templates/list",):
+            return create_success_response(request_id, {"templates": _list_templates()})
         
         # Method Not Found (-32601)
         return create_error_response(request_id, -32601, f"Unsupported method: {method}")
