@@ -1,0 +1,7 @@
+{
+  "name": "schoology-copilot-web",
+  "private": true,
+  "scripts": {
+    "build": "echo \"(stub) add React build later\""
+  }
+}

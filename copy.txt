@@ -1,0 +1,1104 @@
+.env
+----
+# Schoology Co-Pilot Configuration
+
+# --- Authentication ---
+# Full session cookie string extracted directly from your provided network request log.
+SCHOOLOGY_COOKIE="s_stats_browser_info=%7B%22pluginInfo%22%3A%7B%22pdf%22%3A%5B%22pdf%22%2C%22application/pdf%22%2C%221%22%5D%2C%22quicktime%22%3A%5B%22qt%22%2C%22video/quicktime%22%2C%220%22%5D%2C%22realplayer%22%3A%5B%22realp%22%2C%22audio/x-pn-realaudio-plugin%22%2C%220%22%5D%2C%22wma%22%3A%5B%22wma%22%2C%22application/x-mplayer2%22%2C%220%22%5D%2C%22director%22%3A%5B%22dir%22%2C%22application/x-director%22%2C%220%22%5D%2C%22flash%22%3A%5B%22fla%22%2C%22application/x-shockwave-flash%22%2C%220%22%5D%2C%22java%22%3A%5B%22java%22%2C%22application/x-java-vm%22%2C%220%22%5D%2C%22gears%22%3A%5B%22gears%22%2C%22application/x-googlegears%22%2C%220%22%5D%2C%22silverlight%22%3A%5B%22ag%22%2C%22application/x-silverlight%22%2C%220%22%5D%7D%2C%22res%22%3A%221710x1112%22%7D; apt.uid=AP-IBYB1G3SIPA6-2-1759590066364-73921151.0.2.2249589b-9e64-489d-b3c6-4a45306f0912; has_js=1; cbLDB=1; SESS203b9bead5ca8f4fbb607005f50a33ad=6f3823c5497bb99fa272a6abc8791465; apt.sid=AP-IBYB1G3SIPA6-2-1759893165423-56892569"
+
+# --- Identifiers ---
+# Your Schoology user ID, extracted from the calendar URL.
+SCHOOLOGY_USER_ID="105724617"
+
+# Comma-separated list of your course IDs, extracted from the URLs provided.
+SCHOOLOGY_COURSE_IDS="7890186853,7890186902,7890186797,7890186817,7890186659,7890656563"
+
+# --- Server Configuration ---
+# Host on 0.0.0.0 to be accessible from your router's port forwarding.
+APP_HOST="0.0.0.0"
+
+# Port your router is forwarding to on this machine.
+APP_PORT="5544"
+
+______________
+
+
+.env.test
+----
+# Schoology Co-Pilot Configuration
+
+# --- Authentication ---
+# Full session cookie string extracted directly from your provided network request log.
+SCHOOLOGY_COOKIE="s_stats_browser_info=%7B%22pluginInfo%22%3A%7B%22pdf%22%3A%5B%22pdf%22%2C%22application/pdf%22%2C%221%22%5D%2C%22quicktime%22%3A%5B%22qt%22%2C%22video/quicktime%22%2C%220%22%5D%2C%22realplayer%22%3A%5B%22realp%22%2C%22audio/x-pn-realaudio-plugin%22%2C%220%22%5D%2C%22wma%22%3A%5B%22wma%22%2C%22application/x-mplayer2%22%2C%220%22%5D%2C%22director%22%3A%5B%22dir%22%2C%22application/x-director%22%2C%220%22%5D%2C%22flash%22%3A%5B%22fla%22%2C%22application/x-shockwave-flash%22%2C%220%22%5D%2C%22java%22%3A%5B%22java%22%2C%22application/x-java-vm%22%2C%220%22%5D%2C%22gears%22%3A%5B%22gears%22%2C%22application/x-googlegears%22%2C%220%22%5D%2C%22silverlight%22%3A%5B%22ag%22%2C%22application/x-silverlight%22%2C%220%22%5D%7D%2C%22res%22%3A%221710x1112%22%7D; apt.uid=AP-IBYB1G3SIPA6-2-1759590066364-73921151.0.2.2249589b-9e64-489d-b3c6-4a45306f0912; has_js=1; cbLDB=1; SESS203b9bead5ca8f4fbb607005f50a33ad=6f3823c5497bb99fa272a6abc8791465; apt.sid=AP-IBYB1G3SIPA6-2-1759893165423-56892569"
+
+# --- Identifiers ---
+# Your Schoology user ID, extracted from the calendar URL.
+SCHOOLOGY_USER_ID="105724617"
+
+# Comma-separated list of your course IDs, extracted from the URLs provided.
+SCHOOLOGY_COURSE_IDS="7890186853,7890186902,7890186797,7890186817,7890186659,7890656563"
+
+# --- Server Configuration ---
+# Host on 0.0.0.0 to be accessible from your router's port forwarding.
+APP_HOST="0.0.0.0"
+
+# Port your router is forwarding to on this machine.
+APP_PORT="5544"
+
+______________
+
+
+PROJECT.md
+----
+# `PROJECT.md`
+
+## Project Name: Schoology Co-Pilot
+
+### 1. Project Goal
+
+To create a conversational agent within ChatGPT that provides a unified, proactive interface to a student's Schoology data. This project will be implemented as a single, self-contained Python application running locally on a desktop PC. It will handle data fetching, storage, and serving requests from the OpenAI Apps SDK via the Model Context Protocol (MCP).
+
+### 2. Core Architecture
+
+The application consists of three primary, concurrently operating components:
+
+1.  **Data Synchronizer:** A background scheduler (`apscheduler`) that periodically fetches data from Schoology's internal web APIs.
+2.  **Local Data Mirror:** A single-file SQLite database (`schoology.db`) that stores a structured, clean version of the fetched data. SQLAlchemy will be used as the ORM.
+3.  **MCP Server:** A FastAPI application running on Uvicorn that exposes a `/mcp` endpoint. It serves near-instantaneous responses to ChatGPT by querying the local SQLite database, not by making live requests to Schoology.
+
+### 3. Tech Stack
+
+*   **Backend Framework:** FastAPI with Uvicorn
+*   **Web Client:** `requests`
+*   **HTML Parsing:** `beautifulsoup4`
+*   **Scheduling:** `apscheduler`
+*   **Database/ORM:** SQLite with SQLAlchemy
+*   **Configuration:** `python-dotenv`
+*   **Frontend (UI Component):** React (This part is separate and will be built in the `web/` directory)
+
+### 4. Project Structure
+
+```
+schoology-copilot/
+├── app/
+│   ├── database/
+│   │   ├── crud.py         # Data access functions (Create, Read, Update).
+│   │   ├── database.py     # SQLAlchemy engine and session management.
+│   │   └── models.py       # SQLAlchemy ORM models (tables).
+│   ├── mcp_server/
+│   │   ├── server.py       # FastAPI app definition and /mcp route.
+│   │   └── tools.py        # Logic for each MCP tool (e.g., get_daily_briefing).
+│   ├── scheduler/
+│   │   ├── scheduler.py    # APScheduler initialization and management.
+│   │   └── sync_job.py     # The main synchronization task function.
+│   └── schoology_client/
+│       └── client.py       # Class-based client for making requests to Schoology.
+├── web/                      # React frontend components (handled separately).
+├── main.py                   # Main application entry point.
+├── schoology.db              # Local SQLite database file.
+├── requirements.txt
+├── .env
+└── .gitignore
+```
+
+### 5. Implementation Details & Data Flow
+
+#### **Step 1: Configuration (`.env`)**
+
+*   Authentication with Schoology will be handled via a session cookie.
+*   The `.env` file must contain:
+    *   `SCHOOLOGY_COOKIE`: The full cookie string copied from a logged-in browser session.
+    *   `SCHOOLOGY_USER_ID`: The user's unique ID found in Schoology URLs.
+    *   `SCHOOLOGY_COURSE_IDS`: A comma-separated list of numeric course IDs for targeted scraping.
+
+#### **Step 2: Schoology Client (`app/schoology_client/client.py`)**
+
+*   A `SchoologyClient` class will encapsulate all web requests.
+*   It will initialize with headers containing the `SCHOOLOGY_COOKIE` from the `.env` file.
+*   It must implement methods to fetch key data points. Start with:
+    *   `get_calendar_events(start_ts, end_ts)`: Hits the `/calendar/...` endpoint. This returns structured JSON directly.
+    *   `get_feed_updates()`: Hits the `/home/feed` endpoint. This returns JSON containing an HTML blob that must be parsed with BeautifulSoup.
+    *   `get_grades(course_id)`: (Endpoint to be discovered) Fetches grades for a specific course.
+    *   `get_course_assignments(course_id)`: Hits the `/course/.../materials?list_filter=assignments` endpoint. This returns JSON with HTML to be parsed.
+
+#### **Step 3: Database Models (`app/database/models.py`)**
+
+*   Define SQLAlchemy ORM models for each data type. All models should inherit from a declarative `Base`.
+*   **`Assignment` Model:** `id` (Schoology's ID, primary key), `title`, `due_date`, `course_name`, `url`.
+*   **`Event` Model:** `id`, `title`, `start_time`, `end_time`, `source` (e.g., 'Class of 2026').
+*   **`Update` Model:** `id`, `author`, `content_html`, `timestamp`, `source`.
+*   **`Grade` Model:** `id`, `assignment_title`, `score_raw` (e.g., "92/100"), `course_name`.
+
+#### **Step 4: Data Synchronization (`app/scheduler/sync_job.py`)**
+
+*   The `sync_schoology_data()` function is the core of the cron job.
+*   On each run, it will:
+    1.  Instantiate `SchoologyClient`.
+    2.  Get a new database session (`SessionLocal()`).
+    3.  Call the client's fetch methods to get fresh data.
+    4.  Iterate through the results. For each item (e.g., an assignment), use a `crud` function to perform an "upsert":
+        *   If an assignment with that ID already exists in the database, update its fields.
+        *   If it doesn't exist, create a new record.
+    5.  Commit the session and close it.
+
+#### **Step 5: MCP Server (`app/mcp_server/`)**
+
+*   The `server.py` file will define the FastAPI application.
+*   It will have a single POST route: `/mcp`.
+*   This route will handle `list_tools` and `call_tool` requests.
+*   The logic for `call_tool` will be delegated to functions in `tools.py`.
+*   **Tool Functions (e.g., `build_daily_briefing(db: Session)`) will exclusively query the local SQLite database via `crud` functions.** They must **NOT** call the `SchoologyClient`. This ensures speed.
+*   The tool function will format the data from the database into the required `structuredContent` JSON payload for the MCP response.
+
+#### **Step 6: Main Entry Point (`main.py`)**
+
+*   This script ties everything together. It will:
+    1.  Load environment variables from `.env` using `dotenv`.
+    2.  Initialize the database tables using `Base.metadata.create_all(bind=engine)`.
+    3.  Instantiate and start the `apscheduler` in a background thread, configured to run `sync_schoology_data()` every 5 minutes.
+    4.  Run the FastAPI application using `uvicorn.run()`.
+
+______________
+
+
+README.md
+----
+# Schoology Co-Pilot
+
+A conversational agent that transforms the fragmented Schoology platform into a unified, proactive assistant for students within ChatGPT.
+
+## Quick Start
+
+### 1. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Configure Environment
+
+Copy the `.env` file and fill in your Schoology credentials:
+
+```bash
+cp .env .env.local
+# Edit .env.local with your actual values
+```
+
+Required environment variables:
+- `SCHOOLOGY_COOKIE`: Your session cookie from a logged-in browser
+- `SCHOOLOGY_USER_ID`: Your user ID (found in Schoology URLs)
+- `SCHOOLOGY_COURSE_IDS`: Comma-separated list of course IDs to monitor
+
+### 3. Seed Sample Data (Optional)
+
+For testing purposes, you can add sample assignments:
+
+```bash
+python seed_data.py
+```
+
+### 4. Run the Application
+
+```bash
+python main.py
+```
+
+The MCP server will be available at `http://localhost:8000`
+
+## Project Structure
+
+```
+schoology-copilot/
+├── app/
+│   ├── database/          # SQLAlchemy models and database setup
+│   ├── mcp_server/        # FastAPI MCP server and tools
+│   ├── scheduler/         # Background data synchronization
+│   └── schoology_client/  # Schoology API client
+├── web/                   # React frontend (future)
+├── main.py               # Application entry point
+├── seed_data.py          # Sample data seeder
+└── requirements.txt      # Python dependencies
+```
+
+## Features
+
+### Current (Stub Implementation)
+- **System Ping**: Basic connectivity test
+- **Daily Briefing**: Shows upcoming assignments (with sample data)
+
+### Planned
+- **Performance Dashboard**: Grade tracking and trends
+- **Interactive Planner**: Kanban-style task management
+- **Proactive Alerts**: Real-time notifications for new grades/assignments
+
+## Development
+
+The application consists of three main components:
+
+1. **Data Synchronizer**: Background scheduler that fetches data from Schoology
+2. **Local Data Mirror**: SQLite database storing structured data
+3. **MCP Server**: FastAPI server exposing tools to ChatGPT
+
+## API Endpoints
+
+- `GET /healthz` - Health check
+- `POST /mcp` - MCP protocol endpoint for ChatGPT integration
+
+## MCP Tools
+
+- `system.ping` - Test server connectivity
+- `briefing.get` - Get daily briefing with upcoming assignments
+
+## Next Steps
+
+1. Implement real Schoology API endpoints in `SchoologyClient`
+2. Add grade tracking and performance dashboard
+3. Build interactive planner with Kanban board
+4. Create React frontend components
+5. Add real-time notifications and alerts
+
+______________
+
+
+VISION.md
+----
+# `VISION.md`
+
+## Project: Schoology Co-Pilot
+
+### High-Level Vision
+
+The Schoology Co-Pilot is a conversational agent, built on the OpenAI Apps SDK, that transforms the fragmented and noisy Schoology platform into a unified, proactive, and actionable assistant for students. It eliminates the cognitive load of navigating countless pages and feeds by synthesizing all critical academic and campus life information into a single, intelligent dialogue within ChatGPT.
+
+### The Problem with the Current State
+
+Schoology serves as a digital repository but forces the student to be a reactive information hunter. The core pain points are:
+
+*   **Information Silos:** Critical data is scattered across a dozen separate Course and Group pages, with no single source of truth.
+*   **Signal vs. Noise:** The main feed is a chronological firehose where urgent deadlines, new grades, and low-priority announcements have the same visual weight.
+*   **Reactive Workflow:** The student must manually and repeatedly pull information, check for updates, and synthesize connections in their own mind.
+
+### The Co-Pilot Vision
+
+The Schoology Co-Pilot will be an intelligent partner that manages the logistics of student life, allowing the student to focus on learning and participation. It will provide:
+
+*   A **unified view** of all courses, groups, grades, and deadlines.
+*   **Proactive insights** that surface what's important, right now.
+*   **Actionable components** that turn information into plans and actions directly within the chat.
+
+It moves the user from being an "information puller" to a "decision maker."
+
+---
+
+## Core Features
+
+### 1. The Daily Briefing
+
+*   **Description:** This is the cornerstone feature. At any time, the user can ask for a complete, prioritized summary of their academic and campus life. The Co-Pilot will scan all courses and groups to synthesize a single, digestible intelligence report.
+*   **Interaction:** The user prompts, "What's my daily briefing?" or "What's up for today?". The Co-Pilot responds with a rich, interactive component that displays:
+    *   **High-Priority Tasks:** Assignments and assessments due within the next 24-48 hours.
+    *   **Key Announcements:** An intelligent summary of important new posts, filtering out social chatter.
+    *   **Upcoming Events:** A unified calendar view of class events, club meetings, and school-wide deadlines.
+*   **Example Prompts:**
+    *   `"What's my briefing?"`
+    *   `"What do I need to worry about today?"`
+    *   `"Give me a rundown of the week."`
+
+### 2. The Performance Dashboard
+
+*   **Description:** This feature transforms the stressful, reactive process of checking grades into a proactive and insightful experience. It tracks grade changes, provides context, and helps the user understand their academic standing at a glance.
+*   **Interaction:** When a new grade is posted, the Co-Pilot can proactively alert the user. The user can also ask, "How are my grades?". The Co-Pilot will render an interactive component showing:
+    *   **New Grade Alerts:** A prominent notification for any recently posted grade.
+    *   **Class Averages:** A clean list of current averages for all courses.
+    *   **Performance Trends:** Simple visual indicators (e.g., `↑` or `↓`) to show if a grade has improved or declined since the last new entry. The user can then ask follow-up questions like, `"Why did my Physics grade change?"` to get a breakdown.
+*   **Example Prompts:**
+    *   `"Any new grades?"`
+    *   `"How am I doing in AP Calculus?"`
+    *   `"Show me my current academic performance."`
+
+### 3. The Interactive Planner
+
+*   **Description:** This feature turns the static "To-Do" list into a dynamic, personal planning workspace. It allows the user to organize their assignments and personal tasks, turning intent into a concrete plan.
+*   **Interaction:** The user prompts, "Help me plan my night." The Co-Pilot fetches all upcoming assignments and presents them in a `fullscreen` Kanban-style board component. The user can:
+    *   **Prioritize:** Drag and drop tasks into "To Do," "In Progress," and "Done" columns.
+    *   **Augment:** Add their own personal tasks (e.g., "Study for SAT," "Finish college essay").
+    *   **Persist:** The state of the board is saved, so the plan is always up-to-date and can be revisited in any future conversation.
+*   **Example Prompts:**
+    *   `"Let's plan my week."`
+    *   `"I have 3 hours to work, what should I focus on?"`
+    *   `"Show me my current plan."`
+
+______________
+
+
+main.py
+----
+# main.py
+
+import uvicorn
+import os
+from dotenv import load_dotenv
+from app.database.database import init_db
+from app.scheduler.scheduler import start_scheduler
+from app.mcp_server.server import app
+
+def main():
+    """Main entry point to run the application."""
+    # Load environment variables from .env
+    load_dotenv()
+
+    # Initialize the database (creates tables if they don't exist)
+    init_db()
+
+    # Start the background scheduler in a separate thread
+    start_scheduler()
+
+    # Get host and port from environment, with defaults
+    host = os.getenv("APP_HOST", "0.0.0.0")
+    port = int(os.getenv("APP_PORT", 8000))
+    
+    print(f"🚀 Starting MCP server on http://{host}:{port}")
+    # Run the FastAPI app using uvicorn
+    uvicorn.run(app, host=host, port=port)
+
+if __name__ == "__main__":
+    main()
+
+______________
+
+
+requirements.txt
+----
+fastapi>=0.115
+uvicorn[standard]>=0.30
+SQLAlchemy>=2.0
+python-dotenv>=1.0
+APScheduler>=3.10
+requests>=2.32
+beautifulsoup4>=4.12
+bleach>=6.1
+pydantic>=2.7
+
+
+______________
+
+
+seed_data.py
+----
+#!/usr/bin/env python3
+"""
+Quick seeder script to add sample data for testing.
+Run this once to populate the database with sample assignments.
+"""
+
+from app.database.database import SessionLocal, init_db
+from app.database.models import Assignment
+from datetime import datetime, timedelta, timezone
+
+def seed_sample_data():
+    """Add sample assignments to the database for testing."""
+    init_db()
+    db = SessionLocal()
+    
+    try:
+        # Add a few sample assignments
+        sample_assignments = [
+            Assignment(
+                id=1001, 
+                course_id=1, 
+                course_name="AP Calculus", 
+                title="Homework 1: Limits and Continuity",
+                due_at_utc=datetime.now(timezone.utc) + timedelta(hours=12), 
+                url="https://example.com/calc-hw1"
+            ),
+            Assignment(
+                id=1002, 
+                course_id=2, 
+                course_name="AP Physics", 
+                title="Lab Report: Projectile Motion",
+                due_at_utc=datetime.now(timezone.utc) + timedelta(hours=36), 
+                url="https://example.com/physics-lab1"
+            ),
+            Assignment(
+                id=1003, 
+                course_id=3, 
+                course_name="English Literature", 
+                title="Essay: Analysis of 'The Great Gatsby'",
+                due_at_utc=datetime.now(timezone.utc) + timedelta(days=3), 
+                url="https://example.com/english-essay1"
+            ),
+        ]
+        
+        for assignment in sample_assignments:
+            db.add(assignment)
+        
+        db.commit()
+        print(f"✅ Added {len(sample_assignments)} sample assignments to the database")
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error seeding data: {e}")
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    seed_sample_data()
+
+
+______________
+
+
+test_client.py
+----
+# test_client.py
+
+import os
+from dotenv import load_dotenv
+from datetime import datetime, timedelta, timezone
+from app.schoology_client.client import SchoologyClient
+
+def test_calendar_fetch():
+    """
+    Loads environment variables and fetches calendar events for the next 30 days.
+    """
+    # Load .env file from the project root
+    print("Loading environment variables...")
+    load_dotenv()
+
+    # Check if credentials are loaded
+    cookie = os.getenv("SCHOOLOGY_COOKIE")
+    user_id = os.getenv("SCHOOLOGY_USER_ID")
+    if not cookie or not user_id:
+        print("❌ ERROR: SCHOOLOGY_COOKIE and SCHOOLOGY_USER_ID must be set in your .env file.")
+        return
+
+    print("Credentials loaded. Initializing Schoology Client...")
+    client = SchoologyClient()
+
+    # Define the time range: from now to 30 days from now
+    now = datetime.now(timezone.utc)
+    end_date = now + timedelta(days=30)
+    
+    start_timestamp = int(now.timestamp())
+    end_timestamp = int(end_date.timestamp())
+
+    print(f"\nFetching events from {now.isoformat()} to {end_date.isoformat()}...")
+    events = client.get_calendar_events(start_ts=start_timestamp, end_ts=end_timestamp)
+
+    if not events:
+        print("\n❌ No events returned. Check the following:")
+        print("   1. Is your SCHOOLOGY_COOKIE valid and not expired?")
+        print("   2. Is the SCHOOLOGY_USER_ID correct?")
+        print("   3. Is there an issue with the constructed URL or network connectivity?")
+        return
+
+    print(f"\n✅ Successfully fetched {len(events)} events!")
+    print("--- Sample Events ---")
+    
+    for i, event in enumerate(events[:5]): # Print the first 5 events
+        event_type = event.get('e_type', 'N/A')
+        title = event.get('titleText', 'No Title')
+        source = event.get('content_title', 'N/A')
+        start_time = event.get('start', 'N/A')
+        
+        print(f"\nEvent {i+1}:")
+        print(f"  Title: {title}")
+        print(f"  Type: {event_type}")
+        print(f"  Source: {source}")
+        print(f"  Start Time: {start_time}")
+    
+    print("\n--- End of Sample ---")
+
+
+if __name__ == "__main__":
+    test_calendar_fetch()
+
+______________
+
+
+app/__init__.py
+----
+
+
+______________
+
+
+app/mcp_server/__init__.py
+----
+
+
+______________
+
+
+app/mcp_server/server.py
+----
+# app/mcp_server/server.py
+
+from fastapi import FastAPI, Depends, Request, HTTPException
+from sqlalchemy.orm import Session
+from app.database.database import get_db
+from app.mcp_server.tools import list_tools as _list_tools, call_tool as _call_tool
+from typing import Dict, Any
+
+app = FastAPI(title="Schoology Co-Pilot MCP")
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
+
+# --- JSON-RPC Helper Functions ---
+
+def create_success_response(request_id: str | int, result: Dict[str, Any]) -> Dict[str, Any]:
+    """Wraps a successful result in the JSON-RPC 2.0 envelope."""
+    return {
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "result": result
+    }
+
+def create_error_response(request_id: str | int | None, code: int, message: str) -> Dict[str, Any]:
+    """Wraps an error in the JSON-RPC 2.0 envelope."""
+    # Use -1 as ID if the original request ID is unknown (e.g., parse error)
+    return {
+        "jsonrpc": "2.0",
+        "id": request_id if request_id is not None else -1,
+        "error": {
+            "code": code,
+            "message": message
+        }
+    }
+
+# --- MCP Endpoint (Modified) ---
+
+@app.post("/mcp")
+async def mcp(request: Request, db: Session = Depends(get_db)):
+    try:
+        body = await request.json()
+    except Exception:
+        # JSON Parse Error (-32700)
+        return create_error_response(None, -32700, "Invalid JSON received")
+
+    # Extract required JSON-RPC fields (id, method)
+    jsonrpc_version = body.get("jsonrpc")
+    request_id = body.get("id")
+    method = body.get("method")
+
+    # Validate basic JSON-RPC structure
+    if jsonrpc_version != "2.0" or request_id is None or method is None:
+        # Invalid Request (-32600)
+        return create_error_response(request_id or None, -32600, "Invalid Request structure. Must contain jsonrpc:'2.0', id, and method.")
+
+    try:
+        if method == "list_tools":
+            tools = _list_tools()
+            # The result for list_tools is an object containing the 'tools' key
+            return create_success_response(request_id, {"tools": tools})
+
+        if method == "call_tool":
+            params = body.get("params", {})
+            name = params.get("name")
+            args = params.get("args", {}) or {}
+            
+            if not name:
+                # Invalid Params (-32602)
+                return create_error_response(request_id, -32602, "Tool name is required in params.")
+
+            result = _call_tool(name, args, db)
+            
+            # The result from _call_tool already contains structuredContent, content, and _meta.
+            # We place this raw result directly into the JSON-RPC 'result' envelope.
+            return create_success_response(request_id, result)
+        
+        # Method Not Found (-32601)
+        return create_error_response(request_id, -32601, f"Unsupported method: {method}")
+
+    except Exception as e:
+        # Internal Server Error (-32603)
+        import traceback
+        traceback.print_exc() # Log the error on the server side
+        return create_error_response(request_id, -32603, f"Internal error during MCP execution: {type(e).__name__}")
+
+______________
+
+
+app/mcp_server/tools.py
+----
+from datetime import datetime, timezone
+from sqlalchemy.orm import Session
+from app.database import crud
+
+def list_tools():
+    return [
+        {
+            "name": "system.ping",
+            "title": "Ping tool",
+            "description": "Use this to verify the MCP server is reachable.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "annotations": {"readOnlyHint": True},
+            "_meta": {
+                # No UI for ping
+            },
+        },
+        {
+            "name": "briefing.get",
+            "title": "Daily Briefing",
+            "description": "Use this when the user asks what's important today/this week.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "range": {
+                        "type": "string",
+                        "enum": ["today", "48h", "week"],
+                        "default": "today",
+                    }
+                },
+                "additionalProperties": False,
+            },
+            "annotations": {"readOnlyHint": True},
+            "_meta": {
+                "openai/outputTemplate": "ui://widget/briefing.html",
+            },
+        },
+    ]
+
+def call_tool(name: str, args: dict, db: Session):
+    if name == "system.ping":
+        return {
+            "structuredContent": {"pong": True, "now": datetime.now(timezone.utc).isoformat()},
+            "content": [{"type": "text", "text": "pong"}],
+            "_meta": {},
+        }
+
+    if name == "briefing.get":
+        window = args.get("range", "today")
+        hours = 24 if window == "today" else (48 if window == "48h" else 7 * 24)
+        assignments = crud.upcoming_assignments(db, window_hours=hours, limit=10)
+        items = [
+            {
+                "type": "assignment",
+                "id": a.id,
+                "title": a.title,
+                "dueAt": a.due_at_utc.isoformat() if a.due_at_utc else None,
+                "course": a.course_name,
+                "url": a.url,
+            }
+            for a in assignments
+        ]
+        return {
+            "structuredContent": {
+                "highPriority": items,
+                "announcements": [],
+                "events": [],
+                "generatedAt": datetime.now(timezone.utc).isoformat(),
+            },
+            "content": [{"type": "text", "text": "Here's your current briefing."}],
+            "_meta": {},
+        }
+
+    # unknown tool
+    return {
+        "error": {"message": f"Unknown tool: {name}"},
+        "structuredContent": {},
+        "_meta": {},
+    }
+
+
+______________
+
+
+app/scheduler/__init__.py
+----
+
+
+______________
+
+
+app/scheduler/scheduler.py
+----
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from sqlalchemy.orm import Session
+from app.database.database import SessionLocal
+from app.scheduler.sync_job import sync_schoology_data
+import random
+
+_scheduler: BackgroundScheduler | None = None
+
+def _job_wrapper():
+    db: Session = SessionLocal()
+    try:
+        sync_schoology_data(db)
+    finally:
+        db.close()
+
+def start_scheduler():
+    global _scheduler
+    if _scheduler:
+        return _scheduler
+    _scheduler = BackgroundScheduler(timezone="UTC")
+    # jitter to avoid thundering herd; run every 5 minutes
+    _scheduler.add_job(_job_wrapper, IntervalTrigger(minutes=5, jitter=random.randint(0, 60)))
+    _scheduler.start()
+    return _scheduler
+
+
+______________
+
+
+app/scheduler/sync_job.py
+----
+# app/scheduler/sync_job.py
+
+from sqlalchemy.orm import Session
+from app.schoology_client.client import SchoologyClient
+from app.database import crud
+from datetime import datetime, timedelta, timezone
+
+def sync_schoology_data(db: Session):
+    print(f"[{datetime.now()}] Starting Schoology sync job...")
+    client = SchoologyClient()
+
+    try:
+        # --- 1. Sync Calendar Events ---
+        now = datetime.now(timezone.utc)
+        # Fetch a wide window: from 1 week ago to 60 days in the future
+        start_date = now - timedelta(days=7)
+        end_date = now + timedelta(days=60)
+        
+        start_ts = int(start_date.timestamp())
+        end_ts = int(end_date.timestamp())
+        
+        events_data = client.get_calendar_events(start_ts=start_ts, end_ts=end_ts)
+        
+        if events_data:
+            print(f"  -> Fetched {len(events_data)} calendar items. Upserting into database...")
+            crud.upsert_calendar_events(db, events_data)
+        else:
+            print("  -> No calendar items returned from Schoology client.")
+
+        # TODO: Add calls to sync feed, grades, etc. here in the future
+        
+        print(f"[{datetime.now()}] Sync job completed successfully.")
+        return {"ok": True}
+
+    except Exception as e:
+        print(f"❌ An error occurred during the sync job: {e}")
+        db.rollback() # Rollback any partial changes on error
+        return {"ok": False, "error": str(e)}
+
+______________
+
+
+app/database/__init__.py
+----
+
+
+______________
+
+
+app/database/crud.py
+----
+# app/database/crud.py
+
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
+from app.database import models
+import re # Import the regular expressions module
+
+# --- (your existing upcoming_assignments function is here) ---
+
+def parse_html_title(html_title: str) -> str:
+    """Extracts clean text from the Schoology HTML title."""
+    if not html_title:
+        return "Untitled"
+    # The clean title is in the 'titleText' field in the raw JSON
+    # but if we only have the HTML, we can parse it.
+    # For now, let's just strip HTML tags. A simple regex will do.
+    clean = re.sub('<.*?>', '', html_title)
+    return clean.strip()
+
+def parse_schoology_date(date_str: str) -> datetime | None:
+    """Parses Schoology's 'YYYY-MM-DD HH:MM:SS' format into a timezone-aware datetime object."""
+    if not date_str:
+        return None
+    # Assuming the dates from Schoology are in the school's local timezone.
+    # For simplicity, let's treat them as naive and then localize to UTC.
+    # A more robust solution would use a library like `pytz` with your school's timezone.
+    dt_naive = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+    # Let's assume your school is in CDT (UTC-5) for this example.
+    # IMPORTANT: Adjust this offset for your actual timezone or use a proper library.
+    # For now, let's just make it timezone-aware in UTC as a placeholder.
+    return dt_naive.replace(tzinfo=timezone.utc) # Simplified assumption
+
+
+def upsert_calendar_events(db: Session, events: list[dict]):
+    """
+    Takes a list of raw event dicts from the SchoologyClient and updates or inserts
+    them into the database, distinguishing between Assignments and Events.
+    """
+    for item in events:
+        is_assignment_type = item.get('e_type') in ['assignment', 'assessment', 'common-assessment', 'discussion']
+        
+        if is_assignment_type:
+            # It's an assignment, handle it in the Assignment table
+            existing_assignment = db.query(models.Assignment).filter(models.Assignment.id == item['id']).first()
+            
+            if existing_assignment:
+                # Update existing assignment
+                existing_assignment.title = item.get('titleText', 'Untitled Assignment')
+                existing_assignment.due_at_utc = parse_schoology_date(item.get('start'))
+                existing_assignment.course_name = item.get('content_title', 'Unknown Course')
+                existing_assignment.url = f"https://classes.esdallas.org/assignment/{item['id']}" # Construct URL
+                existing_assignment.last_seen_at_utc = datetime.now(timezone.utc)
+            else:
+                # Create new assignment
+                new_assignment = models.Assignment(
+                    id=item['id'],
+                    title=item.get('titleText', 'Untitled Assignment'),
+                    due_at_utc=parse_schoology_date(item.get('start')),
+                    course_name=item.get('content_title', 'Unknown Course'),
+                    url=f"https://classes.esdallas.org/assignment/{item['id']}",
+                    course_id=item.get('realm_id'), # Assuming realm_id is the course_id
+                )
+                db.add(new_assignment)
+        else:
+            # It's a generic event, handle it in the Event table
+            existing_event = db.query(models.Event).filter(models.Event.id == item['id']).first()
+
+            if existing_event:
+                # Update existing event
+                existing_event.title = item.get('titleText', 'Untitled Event')
+                existing_event.start_utc = parse_schoology_date(item.get('start'))
+                existing_event.end_utc = parse_schoology_date(item.get('end')) if item.get('has_end') == '1' else None
+                existing_event.source = item.get('content_title', 'Unknown Source')
+            else:
+                # Create new event
+                new_event = models.Event(
+                    id=item['id'],
+                    title=item.get('titleText', 'Untitled Event'),
+                    start_utc=parse_schoology_date(item.get('start')),
+                    end_utc=parse_schoology_date(item.get('end')) if item.get('has_end') == '1' else None,
+                    source=item.get('content_title', 'Unknown Source'),
+                )
+                db.add(new_event)
+                
+    db.commit()
+
+______________
+
+
+app/database/database.py
+----
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+DATABASE_URL = "sqlite:///schoology.db"
+
+engine = create_engine(
+    DATABASE_URL, connect_args={"check_same_thread": False}
+)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+Base = declarative_base()
+
+def init_db():
+    # pragma tuning for local SQLite
+    with engine.connect() as conn:
+        conn.exec_driver_sql("PRAGMA journal_mode=WAL;")
+        conn.exec_driver_sql("PRAGMA synchronous=NORMAL;")
+    from app.database import models  # ensure models registered
+    Base.metadata.create_all(bind=engine)
+
+# FastAPI deps pattern (used in /mcp route)
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+______________
+
+
+app/database/models.py
+----
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Integer, DateTime, Text, Enum
+from datetime import datetime, timezone
+from app.database.database import Base
+
+def utcnow():
+    return datetime.now(timezone.utc)
+
+class Assignment(Base):
+    __tablename__ = "assignments"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    course_id: Mapped[int] = mapped_column(Integer, index=True)
+    course_name: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str] = mapped_column(String(400))
+    due_at_utc: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    url: Mapped[str | None] = mapped_column(String(1024))
+    status: Mapped[str] = mapped_column(String(32), default="open")
+    last_seen_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+class Event(Base):
+    __tablename__ = "events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(400))
+    start_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    end_utc: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source: Mapped[str] = mapped_column(String(255))
+
+class Update(Base):
+    __tablename__ = "updates"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    author: Mapped[str] = mapped_column(String(255))
+    content_html_sanitized: Mapped[str] = mapped_column(Text)
+    posted_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    source: Mapped[str] = mapped_column(String(255))
+
+class Grade(Base):
+    __tablename__ = "grades"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    course_id: Mapped[int] = mapped_column(Integer, index=True)
+    course_name: Mapped[str] = mapped_column(String(255))
+    assignment_id: Mapped[int] = mapped_column(Integer, index=True)
+    assignment_title: Mapped[str] = mapped_column(String(400))
+    score_raw: Mapped[str | None] = mapped_column(String(64))
+    score_pct: Mapped[float | None] = mapped_column()
+    posted_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+class PlannerTask(Base):
+    __tablename__ = "planner_tasks"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(400))
+    due_at_utc: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    origin: Mapped[str] = mapped_column(String(16), default="personal")  # 'schoology'|'personal'
+    schoology_assignment_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    column: Mapped[str] = mapped_column(String(16), default="todo")  # 'todo','in_progress','done'
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+
+
+______________
+
+
+app/schoology_client/__init__.py
+----
+
+
+______________
+
+
+app/schoology_client/client.py
+----
+# app/schoology_client/client.py
+
+import os
+import requests
+import time
+from typing import List, Dict, Any
+
+class SchoologyClient:
+    def __init__(self):
+        """Initializes the SchoologyClient with credentials from environment variables."""
+        cookie = os.getenv("SCHOOLOGY_COOKIE")
+        if not cookie:
+            raise ValueError("SCHOOLOGY_COOKIE environment variable not set.")
+        
+        self.user_id = os.getenv("SCHOOLOGY_USER_ID")
+        if not self.user_id:
+            raise ValueError("SCHOOLOGY_USER_ID environment variable not set.")
+
+        self.base_url = "https://classes.esdallas.org"
+        self.s = requests.Session()
+        self.s.headers.update({
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Cookie": cookie
+        })
+
+    def get_calendar_events(self, start_ts: int, end_ts: int) -> List[Dict[str, Any]]:
+        """
+        Fetches calendar events (assignments, events, etc.) for the user within a given timestamp range.
+        
+        Args:
+            start_ts: The start of the time range as a Unix timestamp.
+            end_ts: The end of the time range as a Unix timestamp.
+
+        Returns:
+            A list of event dictionaries from the Schoology API.
+        """
+        # The path seems to contain year and month, but let's test if it's strictly required.
+        # Often, the start/end params are sufficient. We will build a simple, robust URL.
+        # The '2025-91' part seems complex and might not be necessary if start/end are provided.
+        # Let's try a more generic URL structure first.
+        # After testing, the path component seems to be `/calendar/{user_id}/user_list` for a general view
+        # or just `/calendar/{user_id}`. We will replicate the provided URL structure for reliability.
+
+        # Let's analyze the path: /calendar/105724617/2025-91
+        # It's likely {user_id}/{year}-{month_or_week_number}. We can generate this, but it's brittle.
+        # A simpler approach that often works is to hit a base calendar endpoint. Let's stick to what we know works.
+        
+        current_time_ms = int(time.time() * 1000)
+        # Replicating the provided URL path structure. We'll need to figure out the '91' part.
+        # For now, let's assume it's a static or derivable value. Let's hardcode for the test.
+        # EDIT: Let's assume a simpler path and let the query params do the work. The path might be a view hint.
+        # The most reliable part of the URL is the query string.
+        
+        # A common pattern is /calendar/USER_ID/main
+        # Let's stick to exactly what the browser did:
+        # NOTE: The "2025-91" part might be complex. Let's simplify and test.
+        # A more generic endpoint might be just `/calendar/load_ajax` with user_id in params.
+        # However, let's replicate the known working URL first.
+        
+        # FINAL ATTEMPT: Let's assume the path is dynamic but we can hardcode parts of it for now.
+        # Let's assume the "2025-91" is some kind of view ID. We'll try just using the user ID.
+        url = f"{self.base_url}/calendar/{self.user_id}"
+        
+        params = {
+            "ajax": 1,
+            "start": start_ts,
+            "end": end_ts,
+            "_": current_time_ms # Cache-busting
+        }
+        
+        print(f"Fetching calendar data from: {url} with params: {params}")
+        
+        try:
+            response = self.s.get(url, params=params)
+            response.raise_for_status()  # This will raise an exception for 4xx or 5xx status codes
+            return response.json()
+        except requests.exceptions.HTTPError as http_err:
+            print(f"HTTP error occurred: {http_err}")
+            print(f"Response Body: {response.text}")
+        except requests.exceptions.RequestException as req_err:
+            print(f"Request error occurred: {req_err}")
+        
+        return []
+
+    # --- Stubs for future implementation ---
+    def get_feed_updates(self):
+        return []
+
+    def get_grades(self, course_id: int):
+        return []
+
+    def get_course_assignments(self, course_id: int):
+        return []
+
+______________
+
+
+web/package.json
+----
+{
+  "name": "schoology-copilot-web",
+  "private": true,
+  "scripts": {
+    "build": "echo \"(stub) add React build later\""
+  }
+}
+
+
+______________
