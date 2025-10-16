@@ -1,3 +1,5 @@
+# app/database/models.py
+
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import String, Integer, DateTime, Text, Enum
 from datetime import datetime, timezone
@@ -53,3 +55,16 @@ class PlannerTask(Base):
     schoology_assignment_id: Mapped[int | None] = mapped_column(Integer, index=True)
     column: Mapped[str] = mapped_column(String(16), default="todo")  # 'todo','in_progress','done'
     priority: Mapped[int] = mapped_column(Integer, default=0)
+
+class Resource(Base):
+    __tablename__ = "resources"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    schoology_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    course_id: Mapped[int] = mapped_column(Integer, index=True)
+    # --- THE FIX: Add course_name directly to the model ---
+    course_name: Mapped[str] = mapped_column(String(255), index=True)
+    title: Mapped[str] = mapped_column(String(512))
+    url: Mapped[str] = mapped_column(String(1024), unique=True) # URLs should be unique
+    resource_type: Mapped[str] = mapped_column(String(64), index=True)
+    parent_folder: Mapped[str | None] = mapped_column(String(255))
+    last_seen_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, index=True)

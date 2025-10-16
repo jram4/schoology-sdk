@@ -1,8 +1,5 @@
-# app/mcp_server/server.py
-
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-# ✅ IMPORT StaticFiles
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager
@@ -27,7 +24,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Schoology Co-Pilot", lifespan=lifespan)
 
-# CORS is still important
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,29 +32,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ REPLACEMENT FOR serve_widget.py
-# Get the absolute path to the widget's 'dist' directory
 widget_dist_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'web', 'briefing-widget', 'dist'))
-
 if os.path.exists(widget_dist_path):
-    # Mount the entire dist directory at the '/widget' path
-    app.mount(
-        "/widget",
-        StaticFiles(directory=widget_dist_path, html=True),
-        name="widget"
-    )
+    app.mount("/widget", StaticFiles(directory=widget_dist_path, html=True), name="widget")
     logging.info(f"✅ Widget assets mounted at /widget from {widget_dist_path}")
 else:
     logging.error(f"❌ Widget 'dist' folder not found at {widget_dist_path}")
     logging.error("   Please run: cd web/briefing-widget && npm run build")
 
-
 @app.get("/healthz")
 def health():
     return {"ok": True}
-
-# ... (the rest of your server.py file remains the same) ...
-# (json_rpc_response, serialize_mcp_result, and the /mcp endpoint are all correct)
 
 def json_rpc_response(request_id, result=None, error=None):
     """Helper to build JSON-RPC 2.0 responses."""
@@ -83,17 +67,31 @@ def serialize_mcp_result(result):
         }
     return result
 
+@app.get("/mcp")
+async def mcp_get_handler():
+    """
+    Handles GET requests to the MCP endpoint, typically from health checks.
+    Returns a simple 200 OK response.
+    """
+    return {
+        "status": "ok",
+        "message": "MCP server is running. Use POST for JSON-RPC requests."
+    }
+
 @app.post("/mcp")
 async def mcp_endpoint(request: Request, db: Session = Depends(get_db)):
+    """
+    Handles POST requests to the MCP endpoint for the main JSON-RPC protocol.
+    """
     try:
         body = await request.json()
     except:
         return json_rpc_response(None, error={"code": -32700, "message": "Parse error"})
-    
+
     method = body.get("method")
     req_id = body.get("id", -1)
     params = body.get("params", {})
-    
+
     try:
         if method == "initialize":
             return json_rpc_response(req_id, {
@@ -117,8 +115,10 @@ async def mcp_endpoint(request: Request, db: Session = Depends(get_db)):
         elif method in ("resources/list", "list_resources"):
             return json_rpc_response(req_id, {"resources": resources.list_resources()})
         
-        elif method == "resources/read":
+        elif method in ("resources/read", "read_resource"):
             uri = params.get("uri")
+            if not uri:
+                return json_rpc_response(req_id, error={"code": -32602, "message": "Missing uri parameter"})
             result = resources.read_resource(uri)
             if result:
                 return json_rpc_response(req_id, result)
@@ -126,7 +126,7 @@ async def mcp_endpoint(request: Request, db: Session = Depends(get_db)):
         
         else:
             return json_rpc_response(req_id, error={"code": -32601, "message": f"Method not found: {method}"})
-    
+
     except Exception as e:
         import traceback
         traceback.print_exc()

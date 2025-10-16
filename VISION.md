@@ -20,46 +20,45 @@ The Schoology Co-Pilot will be an intelligent partner that manages the logistics
 
 *   A **unified view** of all courses, groups, grades, and deadlines.
 *   **Proactive insights** that surface what's important, right now.
-*   **Actionable components** that turn information into plans and actions directly within the chat.
+*   **Intelligent Context Dumps** to the LLM, enabling semantic search and powerful reasoning over all course materials.
 
 It moves the user from being an "information puller" to a "decision maker."
 
 ---
 
-## Core Features
+## Core Features (Revised)
 
-### 1. The Daily Briefing
+### 1. The Daily Briefing (Assignments & Events)
 
-*   **Description:** This is the cornerstone feature. At any time, the user can ask for a complete, prioritized summary of their academic and campus life. The Co-Pilot will scan all courses and groups to synthesize a single, digestible intelligence report.
-*   **Interaction:** The user prompts, "What's my daily briefing?" or "What's up for today?". The Co-Pilot responds with a rich, interactive component that displays:
+*   **Description:** This is the cornerstone feature, providing a complete, prioritized summary of upcoming academic deadlines and campus life events.
+*   **Interaction:** The user prompts, "What's my daily briefing?" The Co-Pilot responds with a rich, interactive component that displays:
     *   **High-Priority Tasks:** Assignments and assessments due within the next 24-48 hours.
-    *   **Key Announcements:** An intelligent summary of important new posts, filtering out social chatter.
     *   **Upcoming Events:** A unified calendar view of class events, club meetings, and school-wide deadlines.
 *   **Example Prompts:**
     *   `"What's my briefing?"`
     *   `"What do I need to worry about today?"`
-    *   `"Give me a rundown of the week."`
 
-### 2. The Performance Dashboard
+### 2. The Universal Resource Finder (LLM-Native Search)
 
-*   **Description:** This feature transforms the stressful, reactive process of checking grades into a proactive and insightful experience. It tracks grade changes, provides context, and helps the user understand their academic standing at a glance.
-*   **Interaction:** When a new grade is posted, the Co-Pilot can proactively alert the user. The user can also ask, "How are my grades?". The Co-Pilot will render an interactive component showing:
-    *   **New Grade Alerts:** A prominent notification for any recently posted grade.
-    *   **Class Averages:** A clean list of current averages for all courses.
-    *   **Performance Trends:** Simple visual indicators (e.g., `↑` or `↓`) to show if a grade has improved or declined since the last new entry. The user can then ask follow-up questions like, `"Why did my Physics grade change?"` to get a breakdown.
+*   **Description:** This feature replaces manual clicking through course folders. The Co-Pilot provides the LLM with a complete, structured context of all course materials (links, files, assignments, notes), allowing the AI to perform a semantic search and reasoning based on content and intent.
+*   **Interaction:** The user asks a question about a resource. The Co-Pilot calls a "context dump" tool, which returns the entire course material structure. The LLM then reasons over this data and returns the correct link and context.
 *   **Example Prompts:**
-    *   `"Any new grades?"`
-    *   `"How am I doing in AP Calculus?"`
-    *   `"Show me my current academic performance."`
+    *   `"Where is the syllabus for AP English?"`
+    *   `"Find the PDF about the derivative in my Calculus class."`
+    *   `"What resources do I have for the Hamlet unit?"`
 
-### 3. The Interactive Planner
+### 3. The Intelligent Update Digest
 
-*   **Description:** This feature turns the static "To-Do" list into a dynamic, personal planning workspace. It allows the user to organize their assignments and personal tasks, turning intent into a concrete plan.
-*   **Interaction:** The user prompts, "Help me plan my night." The Co-Pilot fetches all upcoming assignments and presents them in a `fullscreen` Kanban-style board component. The user can:
-    *   **Prioritize:** Drag and drop tasks into "To Do," "In Progress," and "Done" columns.
-    *   **Augment:** Add their own personal tasks (e.g., "Study for SAT," "Finish college essay").
-    *   **Persist:** The state of the board is saved, so the plan is always up-to-date and can be revisited in any future conversation.
+*   **Description:** This solves the "Signal vs. Noise" problem by synthesizing the Schoology feed and prioritizing announcements from teachers and administrators over social chatter. It tracks which updates have been seen to provide a true "What's New" experience.
+*   **Interaction:** The user asks, "Any new announcements?" The Co-Pilot queries its stateful mirror and returns only the posts received since the last interaction, often summarizing the most important items.
 *   **Example Prompts:**
-    *   `"Let's plan my week."`
-    *   `"I have 3 hours to work, what should I focus on?"`
-    *   `"Show me my current plan."`
+    *   `"What are the key announcements today?"`
+    *   `"Any updates from the US Student Notices group?"`
+
+### 4. The Performance Dashboard (Future)
+
+*   **Description:** Transforms reactive grade checking into a proactive and insightful experience by tracking grade changes and providing performance context.
+*   **Interaction:** The user asks, "How are my grades?". The Co-Pilot renders an interactive component showing new grade alerts, class averages, and performance trends (`↑` or `↓`).
+
+---
+

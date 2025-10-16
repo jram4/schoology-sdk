@@ -10,21 +10,21 @@ To create a conversational agent within ChatGPT that provides a unified, proacti
 
 The application consists of three primary, concurrently operating components:
 
-1.  **Data Synchronizer:** A background scheduler (`apscheduler`) that periodically fetches data from Schoology's internal web APIs.
-2.  **Local Data Mirror:** A single-file SQLite database (`schoology.db`) that stores a structured, clean version of the fetched data. SQLAlchemy will be used as the ORM.
-3.  **MCP Server:** A FastAPI application running on Uvicorn that exposes a `/mcp` endpoint. It serves near-instantaneous responses to ChatGPT by querying the local SQLite database, not by making live requests to Schoology.
+1.  **Data Synchronizer:** A background scheduler (`apscheduler`) that periodically fetches data from Schoology's internal web APIs, creating a complete local mirror.
+2.  **Local Data Mirror:** A single-file SQLite database (`schoology.db`) that stores a structured, clean, and *semantically indexed* version of the fetched data, including full course material hierarchies. SQLAlchemy will be used as the ORM.
+3.  **MCP Server:** A FastAPI application running on Uvicorn that exposes a `/mcp` endpoint. It serves near-instantaneous responses to ChatGPT by querying the local SQLite database.
 
 ### 3. Tech Stack
 
 *   **Backend Framework:** FastAPI with Uvicorn
 *   **Web Client:** `requests`
-*   **HTML Parsing:** `beautifulsoup4`
+*   **HTML Parsing:** `beautifulsoup4` (Critical for updates and course materials)
 *   **Scheduling:** `apscheduler`
 *   **Database/ORM:** SQLite with SQLAlchemy
 *   **Configuration:** `python-dotenv`
-*   **Frontend (UI Component):** React (This part is separate and will be built in the `web/` directory)
+*   **Frontend (UI Component):** React (using the official **Inline HTML Serving Pattern** for portability)
 
-### 4. Project Structure
+### 4. Project Structure (No Change Needed Here)
 
 ```
 schoology-copilot/
@@ -35,7 +35,7 @@ schoology-copilot/
 │   │   └── models.py       # SQLAlchemy ORM models (tables).
 │   ├── mcp_server/
 │   │   ├── server.py       # FastAPI app definition and /mcp route.
-│   │   └── tools.py        # Logic for each MCP tool (e.g., get_daily_briefing).
+│   │   └── tools.py        # Logic for each MCP tool (e.g., briefing.get).
 │   ├── scheduler/
 │   │   ├── scheduler.py    # APScheduler initialization and management.
 │   │   └── sync_job.py     # The main synchronization task function.
@@ -49,7 +49,7 @@ schoology-copilot/
 └── .gitignore
 ```
 
-### 5. Implementation Details & Data Flow
+### 5. Implementation Details & Data Flow (Revised)
 
 #### **Step 1: Configuration (`.env`)**
 
@@ -57,51 +57,42 @@ schoology-copilot/
 *   The `.env` file must contain:
     *   `SCHOOLOGY_COOKIE`: The full cookie string copied from a logged-in browser session.
     *   `SCHOOLOGY_USER_ID`: The user's unique ID found in Schoology URLs.
-    *   `SCHOOLOGY_COURSE_IDS`: A comma-separated list of numeric course IDs for targeted scraping.
+    *   `SCHOOLOGY_COURSE_IDS`: A comma-separated list of numeric course IDs for targeted synchronization.
 
 #### **Step 2: Schoology Client (`app/schoology_client/client.py`)**
 
 *   A `SchoologyClient` class will encapsulate all web requests.
-*   It will initialize with headers containing the `SCHOOLOGY_COOKIE` from the `.env` file.
-*   It must implement methods to fetch key data points. Start with:
-    *   `get_calendar_events(start_ts, end_ts)`: Hits the `/calendar/...` endpoint. This returns structured JSON directly.
-    *   `get_feed_updates()`: Hits the `/home/feed` endpoint. This returns JSON containing an HTML blob that must be parsed with BeautifulSoup.
+*   It must implement methods to fetch key data points:
+    *   `get_calendar_events(start_ts, end_ts)`: Fetches calendar items (assignments/events).
+    *   `get_feed_updates()`: Fetches recent activity/announcements feed (requires HTML parsing).
+    *   `get_course_materials(course_id)`: **(NEW)** Fetches all materials (files, links, folders) for a specific course page (requires extensive HTML parsing to extract hierarchy and links).
     *   `get_grades(course_id)`: (Endpoint to be discovered) Fetches grades for a specific course.
-    *   `get_course_assignments(course_id)`: Hits the `/course/.../materials?list_filter=assignments` endpoint. This returns JSON with HTML to be parsed.
 
 #### **Step 3: Database Models (`app/database/models.py`)**
 
-*   Define SQLAlchemy ORM models for each data type. All models should inherit from a declarative `Base`.
-*   **`Assignment` Model:** `id` (Schoology's ID, primary key), `title`, `due_date`, `course_name`, `url`.
-*   **`Event` Model:** `id`, `title`, `start_time`, `end_time`, `source` (e.g., 'Class of 2026').
-*   **`Update` Model:** `id`, `author`, `content_html`, `timestamp`, `source`.
-*   **`Grade` Model:** `id`, `assignment_title`, `score_raw` (e.g., "92/100"), `course_name`.
+*   Define SQLAlchemy ORM models, including new models for state and resources:
+    *   **`Assignment` Model:** (Existing) For calendar assignments.
+    *   **`Event` Model:** (Existing) For calendar events.
+    *   **`Update` Model:** (Existing) For feed posts/announcements.
+    *   **`Resource` Model:** **(NEW)** To store all course materials (title, URL, type, course ID, folder/unit).
+    *   **`UserState` Model:** **(NEW)** To store non-academic user state, such as `last_seen_updates_utc` for tracking unread announcements.
+    *   **`Grade` Model:** (Existing) For grade tracking.
 
 #### **Step 4: Data Synchronization (`app/scheduler/sync_job.py`)**
 
-*   The `sync_schoology_data()` function is the core of the cron job.
-*   On each run, it will:
-    1.  Instantiate `SchoologyClient`.
-    2.  Get a new database session (`SessionLocal()`).
-    3.  Call the client's fetch methods to get fresh data.
-    4.  Iterate through the results. For each item (e.g., an assignment), use a `crud` function to perform an "upsert":
-        *   If an assignment with that ID already exists in the database, update its fields.
-        *   If it doesn't exist, create a new record.
-    5.  Commit the session and close it.
+*   The `sync_schoology_data()` function is the core cron job.
+*   It performs a complete, multi-step sync and upsert:
+    1.  Sync Calendar Events.
+    2.  Sync Feed Updates.
+    3.  **Sync Course Materials:** Loops through all `SCHOOLOGY_COURSE_IDS`, calls `client.get_course_materials()`, and performs a structured upsert into the `Resource` table.
 
 #### **Step 5: MCP Server (`app/mcp_server/`)**
 
-*   The `server.py` file will define the FastAPI application.
-*   It will have a single POST route: `/mcp`.
-*   This route will handle `list_tools` and `call_tool` requests.
-*   The logic for `call_tool` will be delegated to functions in `tools.py`.
-*   **Tool Functions (e.g., `build_daily_briefing(db: Session)`) will exclusively query the local SQLite database via `crud` functions.** They must **NOT** call the `SchoologyClient`. This ensures speed.
-*   The tool function will format the data from the database into the required `structuredContent` JSON payload for the MCP response.
+*   The `server.py` file defines the FastAPI application and handles the JSON-RPC routing.
+*   The `tools.py` file implements the core logic, using the local database exclusively for speed.
+*   **New Tool:** `resources.get_all(course_name)`: Queries the `Resource` table and returns a dense, structured JSON payload (a "Context Dump") containing all materials for the specified course. **This tool returns no UI.**
+*   **New Tool:** `updates.get_new()`: Queries the `Update` table relative to the user's `UserState.last_seen_updates_utc` and returns a text summary, updating the timestamp afterward.
 
 #### **Step 6: Main Entry Point (`main.py`)**
 
-*   This script ties everything together. It will:
-    1.  Load environment variables from `.env` using `dotenv`.
-    2.  Initialize the database tables using `Base.metadata.create_all(bind=engine)`.
-    3.  Instantiate and start the `apscheduler` in a background thread, configured to run `sync_schoology_data()` every 5 minutes.
-    4.  Run the FastAPI application using `uvicorn.run()`.
+*   This script ties everything together: loading config, initializing the database, starting the background scheduler, and running the FastAPI/MCP server.
