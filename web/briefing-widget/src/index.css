@@ -14,10 +14,6 @@ body {
   box-sizing: border-box;
 }
 
-.loading-state {
-    color: #6b7280;
-}
-
 .briefing-container header {
   margin-bottom: 16px;
 }
@@ -91,13 +87,6 @@ body {
   min-width: 0;
 }
 
-.assignment-info .title {
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .assignment-info .course {
   font-size: 0.875rem;
   color: #6b7280;
@@ -108,9 +97,8 @@ body {
     color: #4b5563;
     flex-shrink: 0;
     margin-left: 16px;
+    font-weight: 500;
 }
-
-/* Add to existing CSS */
 
 .loading-state {
   display: flex;
@@ -142,23 +130,43 @@ body {
   font-size: 0.95rem;
 }
 
+.day-group {
+  margin-bottom: 24px;
+}
 
-.error-state {
+.day-header {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 12px 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.title-wrapper {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 40px;
-  color: #dc2626;
-  text-align: center;
+  gap: 8px;
+  min-width: 0; /* Important for flexbox truncation */
 }
 
-.error-icon {
-  font-size: 3rem;
-  margin-bottom: 12px;
+.title-wrapper .title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.error-state p {
-  margin: 0;
-  color: #6b7280;
+.badge {
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 99px;
+  flex-shrink: 0; /* Prevent the badge from shrinking */
+  text-transform: uppercase;
 }
+
+.badge.type-test { background-color: #fee2e2; color: #b91c1c; }
+.badge.type-quiz { background-color: #dbeafe; color: #1e40af; }
+.badge.type-project { background-color: #d1fae5; color: #065f46; }
+.badge.type-paper { background-color: #fef3c7; color: #92400e; }

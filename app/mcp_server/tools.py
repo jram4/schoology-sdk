@@ -69,6 +69,19 @@ def _fmt_display(dt: datetime | None) -> str:
     except ValueError:
         return dt.strftime("%a, %b %d @ %I:%M %p").replace('AM', 'am').replace('PM', 'pm')
 
+def get_assignment_type(title: str) -> str:
+    """Identify assignment type from its title."""
+    title_lower = title.lower()
+    if "test" in title_lower:
+        return "Test"
+    if "quiz" in title_lower:
+        return "Quiz"
+    if "project" in title_lower:
+        return "Project"
+    if "essay" in title_lower or "paper" in title_lower:
+        return "Paper"
+    return "Homework"  # Default
+
 def call_tool(name: str, args: dict, db: Session) -> types.CallToolResult:
     """Execute tool and return proper MCP result."""
     
@@ -90,7 +103,8 @@ def call_tool(name: str, args: dict, db: Session) -> types.CallToolResult:
     ui_items = [{
         "id": a.id, "title": a.title, "course": a.course_name, "url": a.url,
         "dueAt": a.due_at_utc.isoformat() if a.due_at_utc else None,
-        "dueAtDisplay": _fmt_display(a.due_at_utc)
+        "dueAtDisplay": _fmt_display(a.due_at_utc),
+        "type": get_assignment_type(a.title)
     } for a in assignments]
     
     # Data for the Model (structuredContent): A concise summary

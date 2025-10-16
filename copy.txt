@@ -874,44 +874,54 @@ app/mcp_server/resources.py
 
 import os
 import logging
-from typing import Dict, Any, List
+from pathlib import Path
 
 MIME_TYPE = "text/html+skybridge"
 WIDGET_URI = "ui://widget/briefing.html"
 
+# Store asset content in memory to avoid reading from disk on every request
+_WIDGET_HTML_CACHE = None
+
 def get_widget_html() -> str:
     """
-    Returns the HTML shell that loads the React widget using an absolute URL
-    from the WIDGET_BASE_URL environment variable. This is the correct Pizzaz pattern.
+    Reads the built React JS and CSS from the /dist folder and injects
+    them into an HTML shell. This is the "inline" pattern from the official docs.
     """
-    # ✅ THIS IS THE CRITICAL FIX
-    # Read the public-facing base URL from the environment.
-    base_url = os.getenv("WIDGET_BASE_URL")
-    
-    if not base_url:
-        # Provide a helpful error message if the .env variable is missing.
-        error_msg = "FATAL: WIDGET_BASE_URL is not set in the .env file."
-        logging.error(error_msg)
-        # Return a visible error in the widget for easy debugging.
-        return f"""<div style="font-family: sans-serif; padding: 2em;">
+    global _WIDGET_HTML_CACHE
+    if _WIDGET_HTML_CACHE:
+        return _WIDGET_HTML_CACHE
+
+    try:
+        # Find the path to the 'dist' directory relative to this file
+        dist_path = Path(__file__).parent.parent.parent / "web" / "briefing-widget" / "dist"
+        
+        # Find the specific JS and CSS files Vite generates (they have hashes)
+        assets_path = dist_path / "assets"
+        # Use next() with a generator expression to find the first match
+        js_file = next(assets_path.glob("index-*.js"))
+        css_file = next(assets_path.glob("index-*.css"))
+
+        js_content = js_file.read_text()
+        css_content = css_file.read_text()
+        
+        html = f"""
+<div id="root"></div>
+<style>{css_content}</style>
+<script type="module">{js_content}</script>
+        """.strip()
+
+        _WIDGET_HTML_CACHE = html
+        logging.info(f"✅ Successfully loaded and cached widget assets from {dist_path}")
+        return html
+
+    except (FileNotFoundError, StopIteration) as e:
+        error_msg = "FATAL: Widget asset files not found. Did you run 'npm run build' in /web/briefing-widget?"
+        logging.error(f"{error_msg} - {e}")
+        return f"""<div style="font-family: sans-serif; padding: 2em; color: red;">
                        <h2>Widget Error</h2><p>{error_msg}</p>
-                       <p>Please set it to your ngrok forwarding URL for the widget.</p>
                    </div>"""
 
-    # Construct the full, absolute paths to the assets.
-    css_url = f"{base_url}/assets/index.css"
-    js_url = f"{base_url}/assets/index.js"
-    
-    html = f"""
-<div id="root"></div>
-<link rel="stylesheet" href="{css_url}">
-<script type="module" src="{js_url}"></script>
-""".strip()
-    
-    logging.info(f"[Widget] Generated HTML shell with absolute base URL: {base_url}")
-    return html
-
-def list_resources() -> List[Dict[str, Any]]:
+def list_resources() -> list[dict]:
     """Return list of resource definitions as dicts."""
     return [{
         "uri": WIDGET_URI,
@@ -920,12 +930,10 @@ def list_resources() -> List[Dict[str, Any]]:
         "description": "Interactive daily briefing with assignments"
     }]
 
-def read_resource(uri: str) -> Dict[str, Any] | None:
+def read_resource(uri: str) -> dict | None:
     """Read a resource and return its contents."""
     if uri != WIDGET_URI:
         return None
-    
-    logging.info(f"[Widget] Reading resource: {uri}")
     
     return {
         "contents": [{
@@ -1086,8 +1094,6 @@ from sqlalchemy.orm import Session
 from typing import Any, Dict, List
 import logging
 from app.database import crud
-
-# ✅ CRITICAL: Import MCP types
 import mcp.types as types
 
 WIDGET_URI = "ui://widget/briefing.html"
@@ -1147,66 +1153,71 @@ def _fmt_display(dt: datetime | None) -> str:
     if not dt:
         return ""
     try:
-        return dt.strftime("%a, %b %d @ %-I:%M %p")
-    except:
-        return str(dt)
+        # Use '%-I' on Unix-like systems for non-padded hour, fallback to '%I'
+        return dt.strftime("%a, %b %d @ %-I:%M %p").replace('AM', 'am').replace('PM', 'pm')
+    except ValueError:
+        return dt.strftime("%a, %b %d @ %I:%M %p").replace('AM', 'am').replace('PM', 'pm')
 
 def call_tool(name: str, args: dict, db: Session) -> types.CallToolResult:
     """Execute tool and return proper MCP result."""
     
     if name != "briefing.get":
         return types.CallToolResult(
-            content=[types.TextContent(
-                type="text",
-                text=f"Unknown tool: {name}"
-            )],
+            content=[types.TextContent(type="text", text=f"Unknown tool: {name}")],
             isError=True
         )
     
-    # Get time window
     window = args.get("range", "today").lower().strip()
     hours_map = {"today": 24, "48h": 48, "week": 168}
     hours = hours_map.get(window, 24)
     label_map = {"today": "today", "48h": "the next 48h", "week": "the next 7 days"}
     label = label_map.get(window, "soon")
     
-    # Fetch assignments from database
     assignments = crud.upcoming_assignments(db, window_hours=hours, limit=50)
-    logging.info(f"[Tool] Found {len(assignments)} assignments for window: {window}")
     
-    # Format for widget
-    items = [{
-        "id": a.id,
-        "title": a.title,
-        "course": a.course_name,
-        "url": a.url,
+    # Data for the UI (_meta): The full, detailed list
+    ui_items = [{
+        "id": a.id, "title": a.title, "course": a.course_name, "url": a.url,
         "dueAt": a.due_at_utc.isoformat() if a.due_at_utc else None,
         "dueAtDisplay": _fmt_display(a.due_at_utc)
     } for a in assignments]
     
-    # Build structured content - this is what the widget receives
+    # Data for the Model (structuredContent): A concise summary
+    model_summary_items = [{
+        "title": a.title, "course": a.course_name,
+        "due": _fmt_display(a.due_at_utc)
+    } for a in assignments[:5]] # Only show top 5 to the model
+
+    # Build the final payloads
     structured = {
-        "highPriority": items,
-        "count": len(items),
+        "summary": {
+            "count": len(assignments),
+            "rangeLabel": label,
+            "assignments": model_summary_items
+        }
+    }
+    
+    meta_for_ui = {
+        "assignments": ui_items,
+        "count": len(assignments),
         "range": window,
         "rangeLabel": label,
         "generatedAt": datetime.now(timezone.utc).isoformat()
     }
     
-    logging.info(f"[Tool] Returning structured content with {len(items)} items")
-    
-    # ✅ Get widget resource and serialize it - EXACT Pizzaz pattern
     widget_resource = _embedded_widget_resource()
     
     return types.CallToolResult(
         content=[types.TextContent(
             type="text",
-            text=f"Found {len(items)} assignment(s) due {label}."
+            text=f"Found {len(assignments)} assignment(s) due {label}."
         )],
         structuredContent=structured,
-        meta={  # ✅ CRITICAL: use meta= not _meta=
+        # ✅ THE FIX IS HERE: `_meta=` instead of `meta=`
+        _meta={
             **_tool_meta(),
-            "openai.com/widget": widget_resource.model_dump(mode="json")
+            "openai.com/widget": widget_resource.model_dump(mode="json"),
+            "ui": meta_for_ui # Nest all UI-specific data here
         }
     )
 
@@ -1694,43 +1705,110 @@ ______________
 
 web/briefing-widget/serve.py
 ----
-#!/usr/bin/env python3
-"""
-Simple HTTP server with CORS headers for serving the widget.
-"""
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+# app/mcp_server/server.py
+
+from fastapi import FastAPI, Depends, Request
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 import os
-import sys
+import mcp.types as types
+import logging
 
-class CORSRequestHandler(SimpleHTTPRequestHandler):
-    def end_headers(self):
-        # Add CORS headers
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', '*')
-        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
-        super().end_headers()
-    
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.end_headers()
+from app.database.database import get_db, init_db
+from app.scheduler.scheduler import start_scheduler, stop_scheduler
+from app.mcp_server import tools, resources
 
-if __name__ == '__main__':
-    # Get the directory where this script lives
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    dist_dir = os.path.join(script_dir, 'dist')
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("🚀 Starting up...")
+    load_dotenv()
+    init_db()
+    start_scheduler()
+    yield
+    print("👋 Shutting down...")
+    stop_scheduler()
+
+app = FastAPI(title="Schoology Co-Pilot", lifespan=lifespan)
+
+# CORS is still important for development and communication with ChatGPT
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/healthz")
+def health():
+    return {"ok": True}
+
+def json_rpc_response(request_id, result=None, error=None):
+    """Helper to build JSON-RPC 2.0 responses."""
+    resp = {"jsonrpc": "2.0", "id": request_id}
+    if error:
+        resp["error"] = error
+    else:
+        resp["result"] = result
+    return resp
+
+def serialize_mcp_result(result):
+    """Convert MCP types to JSON-serializable dicts."""
+    if isinstance(result, types.CallToolResult):
+        # The .model_dump() method handles serialization correctly
+        return result.model_dump(mode="json", by_alias=True)
+    return result
+
+@app.post("/mcp")
+async def mcp_endpoint(request: Request, db: Session = Depends(get_db)):
+    try:
+        body = await request.json()
+    except:
+        return json_rpc_response(None, error={"code": -32700, "message": "Parse error"})
     
-    if not os.path.exists(dist_dir):
-        print(f"❌ ERROR: dist directory not found at {dist_dir}")
-        print("   Run 'npm run build' first!")
-        sys.exit(1)
+    method = body.get("method")
+    req_id = body.get("id", -1)
+    params = body.get("params", {})
     
-    os.chdir(dist_dir)
-    port = 8080
-    server = HTTPServer(('0.0.0.0', port), CORSRequestHandler)
-    print(f'✅ Serving widget on http://0.0.0.0:{port} with CORS enabled')
-    print(f'📁 Serving from: {os.getcwd()}')
-    server.serve_forever()
+    try:
+        if method == "initialize":
+            return json_rpc_response(req_id, {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {}, "resources": {}},
+                "serverInfo": {"name": "schoology-copilot", "version": "0.1.0"}
+            })
+        
+        elif method in ("tools/list", "list_tools"):
+            tool_dicts = tools.list_tools()
+            return json_rpc_response(req_id, {"tools": tool_dicts})
+        
+        elif method in ("tools/call", "call_tool"):
+            name = params.get("name")
+            args = params.get("arguments") or params.get("args", {})
+            
+            result_object = tools.call_tool(name, args, db)
+            serialized = serialize_mcp_result(result_object)
+            return json_rpc_response(req_id, serialized)
+        
+        elif method in ("resources/list", "list_resources"):
+            return json_rpc_response(req_id, {"resources": resources.list_resources()})
+        
+        elif method in ("resources/read", "read_resource"):
+            uri = params.get("uri") or (params.get("params", {})).get("uri")
+            result = resources.read_resource(uri)
+            if result:
+                return json_rpc_response(req_id, result)
+            return json_rpc_response(req_id, error={"code": 1, "message": "Not found"})
+        
+        else:
+            return json_rpc_response(req_id, error={"code": -32601, "message": f"Method not found: {method}"})
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return json_rpc_response(req_id, error={"code": -32603, "message": str(e)})
 
 ______________
 
@@ -1742,16 +1820,16 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  // ✅ Add this line to ensure asset paths are generated correctly
   base: './', 
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     rollupOptions: {
       output: {
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]'
+        // This ensures predictable filenames with hashes for cache busting
+        entryFileNames: 'assets/index-[hash].js',
+        chunkFileNames: 'assets/index-[hash].js',
+        assetFileNames: 'assets/index-[hash].[ext]'
       }
     }
   }
@@ -1768,8 +1846,8 @@ web/briefing-widget/dist/index.html
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Briefing Widget</title>
-    <script type="module" crossorigin src="./assets/index.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index.css">
+    <script type="module" crossorigin src="./assets/index-BMjLuB0i.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BqOPGF98.css">
   </head>
   <body>
     <div id="root"></div>
@@ -1791,53 +1869,43 @@ function App() {
   const [data, setData] = useState(null);
   
   useEffect(() => {
-    console.log('[Widget] Mounted, checking for data...');
-    console.log('[Widget] window.oai:', window.oai);
-    
-    // Simple: Just check if window.oai exists and get structuredContent
-    if (window.oai) {
-      console.log('[Widget] window.oai.structuredContent:', window.oai.structuredContent);
-      if (window.oai.structuredContent) {
-        setData(window.oai.structuredContent);
+    // The official API is window.openai
+    if (window.openai) {
+      // Per the docs, UI-specific data is in toolResponseMetadata (_meta)
+      const initialData = window.openai.toolResponseMetadata?.ui;
+      if (initialData) {
+        setData(initialData);
       }
       
-      // Listen for updates
-      if (window.oai.widget) {
-        const handleUpdate = (ctx) => {
-          console.log('[Widget] Context updated:', ctx);
-          setData(ctx);
-        };
-        
-        window.oai.widget.on?.('contextUpdate', handleUpdate);
-        
-        return () => {
-          window.oai.widget.off?.('contextUpdate', handleUpdate);
-        };
-      }
+      // It's good practice to listen for updates, though not strictly needed here
+      const handleUpdate = (event) => {
+        if (event.detail.globals.toolResponseMetadata) {
+          setData(event.detail.globals.toolResponseMetadata.ui);
+        }
+      };
+      
+      window.addEventListener("openai:set_globals", handleUpdate);
+      return () => {
+        window.removeEventListener("openai:set_globals", handleUpdate);
+      };
+
     } else {
-      console.error('[Widget] window.oai is not available!');
+      console.error('[Widget] window.openai is not available!');
     }
   }, []);
   
-  const assignments = data?.highPriority ?? [];
+  // Read data from the correct fields based on our new backend structure
+  const assignments = data?.assignments ?? [];
   const count = data?.count ?? 0;
   const rangeLabel = data?.rangeLabel || 'soon';
   const generatedAt = data?.generatedAt ? dayjs(data.generatedAt) : null;
   
-  // Debug view when no data
   if (!data) {
     return (
       <div className="briefing-container">
         <div className="loading-state">
           <div className="spinner"></div>
           <p>Loading briefing...</p>
-          <pre style={{fontSize: '10px', textAlign: 'left', maxWidth: '400px'}}>
-            {JSON.stringify({
-              hasOai: !!window.oai,
-              hasStructured: !!window.oai?.structuredContent,
-              hasWidget: !!window.oai?.widget
-            }, null, 2)}
-          </pre>
         </div>
       </div>
     );

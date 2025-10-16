@@ -1,21 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import dayjs from 'dayjs';
+import calendar from 'dayjs/plugin/calendar';
 import relativeTime from 'dayjs/plugin/relativeTime';
+dayjs.extend(calendar);
 dayjs.extend(relativeTime);
+
+// A helper function to create date groups
+const groupAssignmentsByDay = (assignments) => {
+  if (!assignments || assignments.length === 0) {
+    return {};
+  }
+  
+  const grouped = assignments.reduce((acc, assignment) => {
+    // dayjs().calendar() is powerful. It returns strings like:
+    // "Today at 11:59 PM", "Tomorrow at 1:55 PM", "Last Friday at 2:00 PM", "10/17/2025"
+    // We can split on " at " to get just the day part.
+    const dayKey = dayjs(assignment.dueAt).calendar(null, {
+      sameDay: '[Today]',
+      nextDay: '[Tomorrow]',
+      nextWeek: 'dddd, MMM D', // e.g., "Friday, Oct 17"
+      sameElse: 'MMM D, YYYY'
+    });
+    
+    if (!acc[dayKey]) {
+      acc[dayKey] = [];
+    }
+    acc[dayKey].push(assignment);
+    return acc;
+  }, {});
+
+  return grouped;
+};
+
 
 function App() {
   const [data, setData] = useState(null);
   
   useEffect(() => {
-    // The official API is window.openai
     if (window.openai) {
-      // Per the docs, UI-specific data is in toolResponseMetadata (_meta)
       const initialData = window.openai.toolResponseMetadata?.ui;
       if (initialData) {
         setData(initialData);
       }
       
-      // It's good practice to listen for updates, though not strictly needed here
       const handleUpdate = (event) => {
         if (event.detail.globals.toolResponseMetadata) {
           setData(event.detail.globals.toolResponseMetadata.ui);
@@ -26,17 +53,16 @@ function App() {
       return () => {
         window.removeEventListener("openai:set_globals", handleUpdate);
       };
-
-    } else {
-      console.error('[Widget] window.openai is not available!');
     }
   }, []);
   
-  // Read data from the correct fields based on our new backend structure
   const assignments = data?.assignments ?? [];
   const count = data?.count ?? 0;
   const rangeLabel = data?.rangeLabel || 'soon';
   const generatedAt = data?.generatedAt ? dayjs(data.generatedAt) : null;
+  
+  // useMemo will cache the result of grouping so it doesn't re-run on every render
+  const groupedAssignments = useMemo(() => groupAssignmentsByDay(assignments), [assignments]);
   
   if (!data) {
     return (
@@ -68,21 +94,33 @@ function App() {
       </div>
       
       {assignments.length > 0 ? (
-        <ul className="assignment-list">
-          {assignments.map(item => (
-            <li key={item.id}>
-              <a href={item.url} target="_blank" rel="noopener noreferrer">
-                <div className="assignment-info">
-                  <span className="title">{item.title}</span>
-                  <span className="course">{item.course}</span>
-                </div>
-                <div className="due-date">
-                  {item.dueAtDisplay}
-                </div>
-              </a>
-            </li>
+        <div className="grouped-assignments">
+          {Object.entries(groupedAssignments).map(([day, items]) => (
+            <div key={day} className="day-group">
+              <h4 className="day-header">{day}</h4>
+              <ul className="assignment-list">
+                {items.map(item => (
+                  <li key={item.id}>
+                    <a href={item.url} target="_blank" rel="noopener noreferrer">
+                      <div className="assignment-info">
+                        <div className="title-wrapper">
+                          {item.type !== 'Homework' && (
+                            <span className={`badge type-${item.type.toLowerCase()}`}>{item.type}</span>
+                          )}
+                          <span className="title">{item.title}</span>
+                        </div>
+                        <span className="course">{item.course}</span>
+                      </div>
+                      <div className="due-date">
+                        {dayjs(item.dueAt).format('h:mm a')}
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       ) : (
         <div className="empty-state">
           ✨ No upcoming assignments in this timeframe!
