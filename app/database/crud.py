@@ -2,20 +2,20 @@
 
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo  # <-- KEEP THIS FOR REFERENCE, BUT NO LONGER USED IN PARSING  # noqa: F401
 from app.database import models
-import re  # Import the regular expressions module
+import re
 
-# ---- NEW: upcoming_assignments used by tools.briefing.get ----
-def upcoming_assignments(db: Session, window_hours: int = 48, limit: int = 10):
+# ---- FIXED: Remove status filter since it's not being set by sync ----
+def upcoming_assignments(db: Session, window_hours: int = 48, limit: int = 20):
     """
-    Return open assignments due within the next `window_hours`.
+    Return assignments due within the next `window_hours`.
     """
     now = datetime.now(timezone.utc)
     end = now + timedelta(hours=window_hours)
     q = (
         db.query(models.Assignment)
-        .filter(models.Assignment.status == "open")
+        # REMOVED: .filter(models.Assignment.status == "open")
         .filter(models.Assignment.due_at_utc != None)  # noqa: E711
         .filter(models.Assignment.due_at_utc >= now)
         .filter(models.Assignment.due_at_utc <= end)
@@ -24,26 +24,26 @@ def upcoming_assignments(db: Session, window_hours: int = 48, limit: int = 10):
     )
     return q.all()
 
-# --- (your existing upcoming_assignments function is here) ---
-
 def parse_html_title(html_title: str) -> str:
     """Extracts clean text from the Schoology HTML title."""
     if not html_title:
         return "Untitled"
-    # The clean title is in the 'titleText' field in the raw JSON
-    # but if we only have the HTML, we can parse it.
-    # For now, let's just strip HTML tags. A simple regex will do.
     clean = re.sub('<.*?>', '', html_title)
     return clean.strip()
 
 def parse_schoology_date(date_str: str) -> datetime | None:
-    """Parses Schoology's 'YYYY-MM-DD HH:MM:SS' (local) into UTC."""
+    """
+    Parses Schoology's 'YYYY-MM-DD HH:MM:SS' into UTC.
+
+    CRITICAL FIX: Based on empirical testing, the Schoology calendar API
+    returns a string that is already effectively UTC, despite appearing as
+    local time. We treat the raw string as naive UTC time to avoid the
+    incorrect UTC conversion offset.
+    """
     if not date_str:
         return None
-    # Treat timestamp as America/Chicago local time then convert to UTC.
-    local = ZoneInfo("America/Chicago")
-    dt_local = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=local)
-    return dt_local.astimezone(timezone.utc)
+    dt_naive = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+    return dt_naive.replace(tzinfo=timezone.utc)
 
 
 def upsert_calendar_events(db: Session, events: list[dict]):
@@ -55,7 +55,14 @@ def upsert_calendar_events(db: Session, events: list[dict]):
         is_assignment_type = item.get('e_type') in ['assignment', 'assessment', 'common-assessment', 'discussion']
         
         if is_assignment_type:
-            # It's an assignment, handle it in the Assignment table
+            # FIX: Use content_id for link construction, as item['id'] is the calendar event ID
+            assignment_id_for_link = item.get('content_id') 
+            if not assignment_id_for_link:
+                assignment_id_for_link = item['id'] 
+                
+            # Use the correct assignment ID and append '/info' for robust linking
+            assignment_url = f"https://classes.esdallas.org/assignment/{assignment_id_for_link}/info"
+            
             existing_assignment = db.query(models.Assignment).filter(models.Assignment.id == item['id']).first()
             
             if existing_assignment:
@@ -63,7 +70,8 @@ def upsert_calendar_events(db: Session, events: list[dict]):
                 existing_assignment.title = item.get('titleText', 'Untitled Assignment')
                 existing_assignment.due_at_utc = parse_schoology_date(item.get('start'))
                 existing_assignment.course_name = item.get('content_title', 'Unknown Course')
-                existing_assignment.url = f"https://classes.esdallas.org/assignment/{item['id']}" # Construct URL
+                existing_assignment.url = assignment_url
+                existing_assignment.status = "open"  # SET STATUS HERE
                 existing_assignment.last_seen_at_utc = datetime.now(timezone.utc)
             else:
                 # Create new assignment
@@ -72,8 +80,9 @@ def upsert_calendar_events(db: Session, events: list[dict]):
                     title=item.get('titleText', 'Untitled Assignment'),
                     due_at_utc=parse_schoology_date(item.get('start')),
                     course_name=item.get('content_title', 'Unknown Course'),
-                    url=f"https://classes.esdallas.org/assignment/{item['id']}",
-                    course_id=item.get('realm_id'), # Assuming realm_id is the course_id
+                    url=assignment_url,
+                    course_id=item.get('realm_id'),
+                    status="open",  # SET STATUS HERE
                 )
                 db.add(new_assignment)
         else:

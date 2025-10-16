@@ -2,28 +2,25 @@
 
 import uvicorn
 import os
-from dotenv import load_dotenv
-from app.database.database import init_db
-from app.scheduler.scheduler import start_scheduler
+import logging
 from app.mcp_server.server import app
 
 def main():
     """Main entry point to run the application."""
-    # Load environment variables from .env
-    load_dotenv()
-
-    # Initialize the database (creates tables if they don't exist)
-    init_db()
-
-    # Start the background scheduler in a separate thread
-    start_scheduler()
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - [%(threadName)s] - %(message)s'
+    )
 
     # Get host and port from environment, with defaults
+    # Note: load_dotenv() is now called inside the lifespan manager
     host = os.getenv("APP_HOST", "0.0.0.0")
-    port = int(os.getenv("APP_PORT", 8000))
+    port = int(os.getenv("APP_PORT", "5544")) # Default to your port
     
-    print(f"🚀 Starting MCP server on http://{host}:{port}")
+    logging.info(f"🚀 Starting Uvicorn server process on http://{host}:{port}")
     # Run the FastAPI app using uvicorn
+    # The 'app' object now contains the lifespan logic
     uvicorn.run(app, host=host, port=port)
 
 if __name__ == "__main__":

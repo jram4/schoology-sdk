@@ -1,105 +1,72 @@
 # app/mcp_server/resources.py
 
-from typing import Dict, Any, List
-from datetime import datetime
+import os
+import logging
+from pathlib import Path
 
-def render_briefing_widget(assignments: List[Dict[str, Any]], generated_at: str) -> str:
+MIME_TYPE = "text/html+skybridge"
+WIDGET_URI = "ui://widget/briefing.html"
+
+# Store asset content in memory to avoid reading from disk on every request
+_WIDGET_HTML_CACHE = None
+
+def get_widget_html() -> str:
     """
-    Server-side render the briefing widget with actual data.
+    Reads the built React JS and CSS from the /dist folder and injects
+    them into an HTML shell. This is the "inline" pattern from the official docs.
     """
-    
-    def format_datetime(iso_str: str) -> str:
-        """Format ISO datetime for display"""
-        if not iso_str:
-            return ""
-        try:
-            dt = datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
-            return dt.strftime('%b %d, %Y — %I:%M %p UTC')
-        except:
-            return iso_str
-    
-    # Build assignment HTML
-    if not assignments:
-        assignments_html = '<div style="opacity:.7;">No urgent assignments.</div>'
-    else:
-        items_html = []
-        for item in assignments:
-            title = item.get('title', 'Untitled')
-            course = item.get('course', '')
-            due_at = format_datetime(item.get('dueAt', ''))
-            url = item.get('url', '')
-            
-            course_html = f' — <em>{course}</em>' if course else ''
-            link_html = f'<a href="{url}" target="_blank" rel="noopener noreferrer" style="font-size:12px; text-decoration:none; color:#0066cc;">View Assignment →</a>' if url else ''
-            
-            items_html.append(f'''
-                <div style="padding:8px 0; border-top:1px solid rgba(0,0,0,.08);">
-                    <div style="display:flex; justify-content:space-between; gap:8px;">
-                        <div style="min-width:0;">
-                            <strong style="word-break:break-word;">{title}</strong>{course_html}
-                        </div>
-                        <div style="white-space:nowrap; opacity:.8; font-size:12px;">{due_at}</div>
-                    </div>
-                    {link_html}
-                </div>
-            ''')
-        assignments_html = ''.join(items_html)
-    
-    gen_text = f'Generated: {format_datetime(generated_at)}' if generated_at else ''
-    
-    return f'''
-<div id="briefing-root" style="font: 14px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 8px 12px;">
-    <h3 style="margin:0 0 8px;">Daily Briefing</h3>
-    <div style="opacity:.7; font-size:12px; margin-bottom:8px;">{gen_text}</div>
-    <div id="assignments">{assignments_html}</div>
-</div>
-    '''.strip()
+    global _WIDGET_HTML_CACHE
+    if _WIDGET_HTML_CACHE:
+        return _WIDGET_HTML_CACHE
 
+    try:
+        # Find the path to the 'dist' directory relative to this file
+        dist_path = Path(__file__).parent.parent.parent / "web" / "briefing-widget" / "dist"
+        
+        # Find the specific JS and CSS files Vite generates (they have hashes)
+        assets_path = dist_path / "assets"
+        # Use next() with a generator expression to find the first match
+        js_file = next(assets_path.glob("index-*.js"))
+        css_file = next(assets_path.glob("index-*.css"))
 
-def get_briefing_resource(assignments: List[Dict[str, Any]], generated_at: str) -> Dict[str, Any]:
-    """Generate the briefing resource with rendered HTML"""
-    html = render_briefing_widget(assignments, generated_at)
-    
-    return {
-        "contents": [
-            {
-                "uri": "ui://widget/briefing.html",
-                "mimeType": "text/html+skybridge",
-                "text": html,
-                "_meta": {
-                    "openai/widgetDescription": (
-                        "Displays upcoming assignments within the requested time range. "
-                        "The widget shows a prioritized list of assignments with due dates and links."
-                    ),
-                    "openai/widgetPrefersBorder": True,
-                }
-            }
-        ]
-    }
+        js_content = js_file.read_text()
+        css_content = css_file.read_text()
+        
+        html = f"""
+<div id="root"></div>
+<style>{css_content}</style>
+<script type="module">{js_content}</script>
+        """.strip()
 
+        _WIDGET_HTML_CACHE = html
+        logging.info(f"✅ Successfully loaded and cached widget assets from {dist_path}")
+        return html
 
-# Static resource list (for resources/list calls)
-def list_resources():
+    except (FileNotFoundError, StopIteration) as e:
+        error_msg = "FATAL: Widget asset files not found. Did you run 'npm run build' in /web/briefing-widget?"
+        logging.error(f"{error_msg} - {e}")
+        return f"""<div style="font-family: sans-serif; padding: 2em; color: red;">
+                       <h2>Widget Error</h2><p>{error_msg}</p>
+                   </div>"""
+
+def list_resources() -> list[dict]:
+    """Return list of resource definitions as dicts."""
     return [{
-        "name": "briefing-widget",
-        "uri": "ui://widget/briefing.html",
-        "mimeType": "text/html+skybridge",
-        "description": "Daily Briefing component (dynamically rendered)"
+        "uri": WIDGET_URI,
+        "mimeType": MIME_TYPE,
+        "name": "Daily Briefing Widget",
+        "description": "Interactive daily briefing with assignments"
     }]
 
-
-def list_templates():
-    return list_resources()
-
-# --- ADDED: The missing read_resource function ---
-def read_resource(uri: str) -> Dict[str, Any] | None:
-    """
-    Handles 'resources/read' calls. Since our widget is dynamic, we return
-    an empty-state version of it if requested directly.
-    """
-    if uri == "ui://widget/briefing.html":
-        # Return the widget with no assignments (its base state)
-        return get_briefing_resource(assignments=[], generated_at="")
+def read_resource(uri: str) -> dict | None:
+    """Read a resource and return its contents."""
+    if uri != WIDGET_URI:
+        return None
     
-    # No other known resources
-    return None
+    return {
+        "contents": [{
+            "uri": WIDGET_URI,
+            "mimeType": MIME_TYPE,
+            "text": get_widget_html(),
+        }]
+    }

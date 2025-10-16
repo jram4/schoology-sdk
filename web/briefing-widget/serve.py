@@ -2,8 +2,6 @@
 
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-# ✅ IMPORT StaticFiles
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -27,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Schoology Co-Pilot", lifespan=lifespan)
 
-# CORS is still important
+# CORS is still important for development and communication with ChatGPT
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,29 +34,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ REPLACEMENT FOR serve_widget.py
-# Get the absolute path to the widget's 'dist' directory
-widget_dist_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'web', 'briefing-widget', 'dist'))
-
-if os.path.exists(widget_dist_path):
-    # Mount the entire dist directory at the '/widget' path
-    app.mount(
-        "/widget",
-        StaticFiles(directory=widget_dist_path, html=True),
-        name="widget"
-    )
-    logging.info(f"✅ Widget assets mounted at /widget from {widget_dist_path}")
-else:
-    logging.error(f"❌ Widget 'dist' folder not found at {widget_dist_path}")
-    logging.error("   Please run: cd web/briefing-widget && npm run build")
-
-
 @app.get("/healthz")
 def health():
     return {"ok": True}
-
-# ... (the rest of your server.py file remains the same) ...
-# (json_rpc_response, serialize_mcp_result, and the /mcp endpoint are all correct)
 
 def json_rpc_response(request_id, result=None, error=None):
     """Helper to build JSON-RPC 2.0 responses."""
@@ -72,15 +50,8 @@ def json_rpc_response(request_id, result=None, error=None):
 def serialize_mcp_result(result):
     """Convert MCP types to JSON-serializable dicts."""
     if isinstance(result, types.CallToolResult):
-        return {
-            "content": [
-                {"type": c.type, "text": c.text}
-                for c in result.content
-            ],
-            "structuredContent": result.structuredContent,
-            "isError": result.isError,
-            "_meta": result.meta
-        }
+        # The .model_dump() method handles serialization correctly
+        return result.model_dump(mode="json", by_alias=True)
     return result
 
 @app.post("/mcp")
@@ -117,8 +88,8 @@ async def mcp_endpoint(request: Request, db: Session = Depends(get_db)):
         elif method in ("resources/list", "list_resources"):
             return json_rpc_response(req_id, {"resources": resources.list_resources()})
         
-        elif method == "resources/read":
-            uri = params.get("uri")
+        elif method in ("resources/read", "read_resource"):
+            uri = params.get("uri") or (params.get("params", {})).get("uri")
             result = resources.read_resource(uri)
             if result:
                 return json_rpc_response(req_id, result)
